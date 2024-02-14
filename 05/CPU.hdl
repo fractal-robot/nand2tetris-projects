@@ -32,5 +32,5 @@ CHIP CPU {
         pc[15];          // Address of next instruction
 
     PARTS:
-    //// Replace this comment with your code.
+    // make the PC circuit!
 }
