@@ -18,15 +18,23 @@ struct CInstructionContent {
   std::string jump;
 };
 
+enum class Type {
+  COMMENT,
+  A_INSTRUCTION,
+  C_INSTRUCTION,
+  L_INSTRUCTION, // (xxx)
+};
+
 class Parser {
 public:
   std::string AVal{};
   CInstructionContent CVal{};
+  Type instructionType;
 
   bool isCOperation{};
 
   Parser(const std::string &line) {
-    Type instructionType{getInstructionType(line)};
+    instructionType = getInstructionType(line);
     std::cout << line << '\n';
 
     if (instructionType == Type::A_INSTRUCTION) {
@@ -56,13 +64,6 @@ public:
   }
 
 private:
-  enum class Type {
-    COMMENT,
-    A_INSTRUCTION,
-    C_INSTRUCTION,
-    L_INSTRUCTION, // (xxx)
-  };
-
   Type getInstructionType(const std::string &line) {
     for (std::size_t i{}; i < std::size(line); i++) {
       switch (line[i]) {
@@ -96,22 +97,15 @@ private:
   }
 
   void parseCInstruction(const std::string &line) {
-
     // if dest empty, = ommited
     bool isDest{false};
     // if jump empty, ; ommited
     bool isJump{false};
 
-    for (const char c : line) {
-      switch (c) {
-      case '=':
-        isDest = true;
-        break;
-      case ';':
-        isJump = true;
-        break;
-      }
-    }
+    if (line.find('=') != std::string::npos)
+      isDest = true;
+    if (line.find(';') != std::string::npos)
+      isJump = true;
 
     std::size_t charIndex{0};
     if (isDest) {
@@ -136,12 +130,14 @@ private:
       ++charIndex;
       if (isJump && line[i] == ';')
         break;
-      CVal.comp += line[i];
+      if (line[i] != ' ' || line[i] != '\t')
+        CVal.comp += line[i];
     }
 
     if (isJump) {
       for (std::size_t i{charIndex}; i < std::size(line); i++) {
-        CVal.jump += line[i];
+        if (line[i] != ' ' || line[i] != '\t')
+          CVal.jump += line[i];
       }
     }
   }
@@ -177,12 +173,6 @@ private:
 
     std::cout << binary << '\n';
 
-    content.dest.find('A') != std::string::npos ? binary += '1' : binary += '0';
-    content.dest.find('D') != std::string::npos ? binary += '1' : binary += '0';
-    content.dest.find('M') != std::string::npos ? binary += '1' : binary += '0';
-
-    std::cout << binary << '\n';
-
     binary += std::to_string(aComp);
 
     std::cout << binary << '\n';
@@ -201,6 +191,12 @@ private:
     };
 
     binary += comp[content.comp];
+
+    std::cout << binary << '\n';
+
+    content.dest.find('A') != std::string::npos ? binary += '1' : binary += '0';
+    content.dest.find('D') != std::string::npos ? binary += '1' : binary += '0';
+    content.dest.find('M') != std::string::npos ? binary += '1' : binary += '0';
 
     std::cout << binary << '\n';
 
@@ -223,18 +219,25 @@ private:
 class SymbolTable {};
 
 int main(int argc, char *argv[]) {
-  std::ifstream file(argv[1]);
-  if (!file.is_open()) {
+
+  std::ifstream in(argv[1]);
+  std::ofstream out;
+  out.open("out.hack");
+  if (!in.is_open()) {
     std::cerr << "Unable to open asm file: " << argv[1];
     return 1;
   }
 
   std::string line;
-  while (std::getline(file, line, '\n')) {
+  while (std::getline(in, line, '\n')) {
     ++lineCounter;
     if (line.empty())
       continue;
     Parser parsed(line);
-    Code code(parsed);
+    if (parsed.instructionType == Type::A_INSTRUCTION ||
+        parsed.instructionType == Type::C_INSTRUCTION) {
+      Code code(parsed);
+      out << code.binary << '\n';
+    }
   }
 }
