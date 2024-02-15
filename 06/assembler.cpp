@@ -1,5 +1,3 @@
-// this is an assembler for the n2t project
-
 #include <algorithm>
 #include <bitset>
 #include <cstddef>
@@ -46,52 +44,25 @@ public:
     if (instructionType == Type::C_INSTRUCTION) {
       isCOperation = true;
       parseCInstruction(line);
-      std::cout << "\n- " << CVal.dest << "\n- " << CVal.comp << "\n- "
-                << CVal.jump << '\n';
+      std::cout << CVal.dest << ' ' << CVal.comp << ' ' << CVal.jump << '\n';
     }
-
-    // stript whitespaces for future binary encoding
-    AVal.erase(std::remove_if(AVal.begin(), AVal.end(), ::isspace), AVal.end());
-    CVal.jump.erase(
-        std::remove_if(CVal.jump.begin(), CVal.jump.end(), ::isspace),
-        CVal.jump.end());
-    CVal.comp.erase(
-        std::remove_if(CVal.comp.begin(), CVal.comp.end(), ::isspace),
-        CVal.comp.end());
-    CVal.dest.erase(
-        std::remove_if(CVal.dest.begin(), CVal.dest.end(), ::isspace),
-        CVal.dest.end());
   }
 
 private:
   Type getInstructionType(const std::string &line) {
-    for (std::size_t i{}; i < std::size(line); i++) {
-      switch (line[i]) {
-      case ' ':
-      case '\t':
-        continue;
-
-      case '/':
-        if (line[i + 1] == '/')
-          return Type::COMMENT;
-      case '@':
-        return Type::A_INSTRUCTION;
-        break;
-      case '(':
-        return Type::L_INSTRUCTION;
-      }
-    }
+    if (line.find("//") != std::string::npos)
+      return Type::COMMENT;
+    if (line.find('@') != std::string::npos)
+      return Type::A_INSTRUCTION;
+    if (line.find('(') != std::string::npos)
+      return Type::L_INSTRUCTION;
 
     return Type::C_INSTRUCTION;
   }
 
   void parseAInstruction(const std::string &line) {
     for (const char c : line) {
-      if (c == ' ' || c == '\t')
-        continue;
-      if (c == '@')
-        continue;
-      else
+      if (c != '@')
         AVal += c;
     }
   }
@@ -110,19 +81,10 @@ private:
     std::size_t charIndex{0};
     if (isDest) {
       for (const char c : line) {
-
         ++charIndex;
-
         if (c == '=')
           break;
-
-        switch (c) {
-        case ' ':
-        case '\t':
-          continue;
-        default:
-          CVal.dest += c;
-        }
+        CVal.dest += c;
       }
     }
 
@@ -130,14 +92,12 @@ private:
       ++charIndex;
       if (isJump && line[i] == ';')
         break;
-      if (line[i] != ' ' || line[i] != '\t')
-        CVal.comp += line[i];
+      CVal.comp += line[i];
     }
 
     if (isJump) {
       for (std::size_t i{charIndex}; i < std::size(line); i++) {
-        if (line[i] != ' ' || line[i] != '\t')
-          CVal.jump += line[i];
+        CVal.jump += line[i];
       }
     }
   }
@@ -166,16 +126,10 @@ private:
       aComp = 1; // fed the ALU with M if M used
     }
 
-    std::cout << "acomp: " << aComp << '\n';
-
     // populate binary instruction
+
     binary += "111";
-
-    std::cout << binary << '\n';
-
     binary += std::to_string(aComp);
-
-    std::cout << binary << '\n';
 
     std::unordered_map<std::string, std::string> comp{
         {"0", "101010"},   {"1", "111111"},   {"-1", "111010"},
@@ -189,25 +143,17 @@ private:
         {"D&A", "000000"}, {"D&M", "000000"}, {"D|A", "010101"},
         {"D|M", "010101"},
     };
-
     binary += comp[content.comp];
-
-    std::cout << binary << '\n';
 
     content.dest.find('A') != std::string::npos ? binary += '1' : binary += '0';
     content.dest.find('D') != std::string::npos ? binary += '1' : binary += '0';
     content.dest.find('M') != std::string::npos ? binary += '1' : binary += '0';
 
-    std::cout << binary << '\n';
-
     std::unordered_map<std::string, std::string> jump{
         {"JGT", "001"}, {"JEQ", "010"}, {"JGE", "011"}, {"JLT", "100"},
         {"JNE", "101"}, {"JLE", "110"}, {"JMP", "111"},
     };
-
     content.jump != "" ? binary += jump[content.jump] : binary += "000";
-
-    std::cout << binary << '\n';
   }
 
   void encodeAOperation(const std::string &content) {
@@ -231,8 +177,11 @@ int main(int argc, char *argv[]) {
   std::string line;
   while (std::getline(in, line, '\n')) {
     ++lineCounter;
+    line.erase(std::remove_if(line.begin(), line.end(), ::isspace), line.end());
     if (line.empty())
       continue;
+    std::cout << line << '\n';
+
     Parser parsed(line);
     if (parsed.instructionType == Type::A_INSTRUCTION ||
         parsed.instructionType == Type::C_INSTRUCTION) {
