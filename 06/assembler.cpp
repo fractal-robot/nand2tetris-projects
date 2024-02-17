@@ -1,14 +1,16 @@
 #include <algorithm>
 #include <bitset>
+#include <cctype>
 #include <cstddef>
 #include <fstream>
 #include <iostream>
 #include <iterator>
 #include <string>
 #include <unordered_map>
+#include <utility>
+#include <vector>
 
-int instructionCounter{};
-int lineCounter{};
+long instructionCounter{};
 
 struct CInstructionContent {
   std::string comp;
@@ -16,7 +18,7 @@ struct CInstructionContent {
   std::string jump;
 };
 
-enum class Type {
+enum class Type : char {
   COMMENT,
   A_INSTRUCTION,
   C_INSTRUCTION,
@@ -26,26 +28,21 @@ enum class Type {
 class Parser {
 public:
   std::string AVal{};
+  std::string LVal{};
   CInstructionContent CVal{};
   Type instructionType;
 
-  bool isCOperation{};
-
   Parser(const std::string &line) {
     instructionType = getInstructionType(line);
-    std::cout << line << '\n';
-
     if (instructionType == Type::A_INSTRUCTION) {
-      isCOperation = false;
       parseAInstruction(line);
-      std::cout << AVal << '\n';
     }
 
-    if (instructionType == Type::C_INSTRUCTION) {
-      isCOperation = true;
+    if (instructionType == Type::C_INSTRUCTION)
       parseCInstruction(line);
-      std::cout << CVal.dest << ' ' << CVal.comp << ' ' << CVal.jump << '\n';
-    }
+
+    if (instructionType == Type::L_INSTRUCTION)
+      parseLInstruction(line);
   }
 
 private:
@@ -64,6 +61,13 @@ private:
     for (const char c : line) {
       if (c != '@')
         AVal += c;
+    }
+  }
+
+  void parseLInstruction(const std::string &line) {
+    for (const char c : line) {
+      if (c != '(' && c != ')')
+        LVal += c;
     }
   }
 
@@ -108,23 +112,18 @@ public:
   std::string binary;
 
   Code(const Parser &parsed) {
-    if (parsed.isCOperation) {
+    if (parsed.instructionType == Type::C_INSTRUCTION)
       encodeCOperation(parsed.CVal);
-    } else {
+    else
       encodeAOperation(parsed.AVal);
-    }
-
-    std::cout << binary << '\n';
-    std::cout << "\n---------\n\n";
   };
 
 private:
   void encodeCOperation(const CInstructionContent &content) {
     // decode comp field
     int aComp{0};
-    if (content.comp.find('M') != std::string::npos) {
+    if (content.comp.find('M') != std::string::npos)
       aComp = 1; // fed the ALU with M if M used
-    }
 
     // populate binary instruction
 
@@ -162,10 +161,46 @@ private:
   }
 };
 
-class SymbolTable {};
+class SymbolTable {
+public:
+  std::unordered_map<std::string, long> symbols{
+      {"SP", 0},   {"LCL", 1},        {"ARG", 2},     {"THIS", 3},
+      {"THAT", 4}, {"SCREEN", 16384}, {"KBD", 24576},
+  };
+
+  long mallocAddr{15}; // start at address 16?
+
+  SymbolTable() {
+    for (int i{0}; i <= 15; ++i)
+      symbols["R" + std::to_string(i)] = i;
+  }
+
+  void desymbolizeInstruction(Parser &parsed) {
+    if (parsed.instructionType == Type::L_INSTRUCTION)
+      desymbolizeLInstruction(parsed);
+    else if (parsed.instructionType == Type::A_INSTRUCTION &&
+             !std::isdigit(parsed.AVal[0])) {
+      std::cout << "going to be processed:" << parsed.AVal << std::endl;
+      desymbolizeAInstruciion(parsed);
+    }
+  }
+
+private:
+  void desymbolizeLInstruction(Parser &parsed) {
+    symbols[parsed.LVal] = instructionCounter;
+  }
+
+  void desymbolizeAInstruciion(Parser &parsed) {
+    if (symbols.count(parsed.AVal) == 0) {
+      symbols[parsed.AVal] = mallocAddr;
+      ++mallocAddr;
+    }
+    std::cout << mallocAddr << '\n';
+    parsed.AVal = std::to_string(symbols[parsed.AVal]);
+  }
+};
 
 int main(int argc, char *argv[]) {
-
   std::ifstream in(argv[1]);
   std::ofstream out;
   out.open("out.hack");
@@ -174,19 +209,46 @@ int main(int argc, char *argv[]) {
     return 1;
   }
 
+  SymbolTable symbols;
+
   std::string line;
+
   while (std::getline(in, line, '\n')) {
-    ++lineCounter;
+    line.erase(std::remove_if(line.begin(), line.end(), ::isspace), line.end());
+    std::cout << line << std::endl;
+    if (line.empty())
+      continue;
+
+    Parser parsed(line);
+    symbols.desymbolizeInstruction(parsed);
+
+    if (parsed.instructionType == Type::A_INSTRUCTION ||
+        parsed.instructionType == Type::C_INSTRUCTION) {
+      instructionCounter++;
+    }
+  }
+
+  in.clear();
+  in.seekg(0);
+
+  while (std::getline(in, line, '\n')) {
     line.erase(std::remove_if(line.begin(), line.end(), ::isspace), line.end());
     if (line.empty())
       continue;
     std::cout << line << '\n';
 
     Parser parsed(line);
+
     if (parsed.instructionType == Type::A_INSTRUCTION ||
         parsed.instructionType == Type::C_INSTRUCTION) {
+      std::cout << "hey" << parsed.AVal << '\n';
+      symbols.desymbolizeInstruction(parsed);
+      std::cout << "heyAfter" << parsed.AVal << '\n';
       Code code(parsed);
       out << code.binary << '\n';
+      std::cout << code.binary << "\n\n----\n\n";
     }
   }
+
+  std::cout << symbols.symbols["ponggame.0"];
 }
