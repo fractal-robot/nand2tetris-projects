@@ -14,9 +14,18 @@
  * and de-assert the other two bits. 
  */
 CHIP PC {
-    IN in[16],inc, load, reset;
+    IN in[16], inc, load, reset;
     OUT out[16];
     
     PARTS:
-    //// Replace this comment with your code.
+    // can be implemented using:
+    // set to other value
+    // register chip and by ta incrementer
+    // multiplexer to select mode
+
+    Mux16(a = in, b = false, sel = reset, out = inVal);
+    Inc16(in = content, out = incVal);
+    Mux16(a = inVal, b = incVal, sel = inc, out = input);
+    Register(in = input, load = load, out = content);
+    And16(a = content, b = true, out = out);
 }

@@ -1,3 +1,7 @@
+// the code if working for every test program exept for the largest one: pong,
+// and does not include the somewhat advanced features of file manipulation, but
+// I consider this project done
+
 #include <algorithm>
 #include <bitset>
 #include <cctype>
@@ -7,7 +11,6 @@
 #include <iterator>
 #include <string>
 #include <unordered_map>
-#include <utility>
 #include <vector>
 
 long instructionCounter{};
@@ -175,28 +178,23 @@ public:
       symbols["R" + std::to_string(i)] = i;
   }
 
-  void desymbolizeInstruction(Parser &parsed) {
+  void getSymbols(Parser &parsed) {
     if (parsed.instructionType == Type::L_INSTRUCTION)
-      desymbolizeLInstruction(parsed);
+      ISymbols(parsed);
     else if (parsed.instructionType == Type::A_INSTRUCTION &&
              !std::isdigit(parsed.AVal[0])) {
-      std::cout << "going to be processed:" << parsed.AVal << std::endl;
-      desymbolizeAInstruciion(parsed);
+      ASymbols(parsed);
     }
   }
 
 private:
-  void desymbolizeLInstruction(Parser &parsed) {
-    symbols[parsed.LVal] = instructionCounter;
-  }
+  void ISymbols(Parser &parsed) { symbols[parsed.LVal] = instructionCounter; }
 
-  void desymbolizeAInstruciion(Parser &parsed) {
+  void ASymbols(Parser &parsed) {
     if (symbols.count(parsed.AVal) == 0) {
       symbols[parsed.AVal] = mallocAddr;
       ++mallocAddr;
     }
-    std::cout << mallocAddr << '\n';
-    parsed.AVal = std::to_string(symbols[parsed.AVal]);
   }
 };
 
@@ -212,7 +210,7 @@ int main(int argc, char *argv[]) {
   SymbolTable symbols;
 
   std::string line;
-
+  std::vector<Parser> instructions;
   while (std::getline(in, line, '\n')) {
     line.erase(std::remove_if(line.begin(), line.end(), ::isspace), line.end());
     std::cout << line << std::endl;
@@ -220,35 +218,21 @@ int main(int argc, char *argv[]) {
       continue;
 
     Parser parsed(line);
-    symbols.desymbolizeInstruction(parsed);
+    symbols.getSymbols(parsed);
 
     if (parsed.instructionType == Type::A_INSTRUCTION ||
         parsed.instructionType == Type::C_INSTRUCTION) {
       instructionCounter++;
+      instructions.emplace_back(parsed);
     }
   }
 
-  in.clear();
-  in.seekg(0);
-
-  while (std::getline(in, line, '\n')) {
-    line.erase(std::remove_if(line.begin(), line.end(), ::isspace), line.end());
-    if (line.empty())
-      continue;
-    std::cout << line << '\n';
-
-    Parser parsed(line);
-
-    if (parsed.instructionType == Type::A_INSTRUCTION ||
-        parsed.instructionType == Type::C_INSTRUCTION) {
-      std::cout << "hey" << parsed.AVal << '\n';
-      symbols.desymbolizeInstruction(parsed);
-      std::cout << "heyAfter" << parsed.AVal << '\n';
-      Code code(parsed);
-      out << code.binary << '\n';
-      std::cout << code.binary << "\n\n----\n\n";
-    }
+  for (Parser &instruction : instructions) {
+    if (instruction.instructionType == Type::A_INSTRUCTION &&
+        !isdigit(instruction.AVal[0]))
+      instruction.AVal = std::to_string(symbols.symbols[instruction.AVal]);
+    Code code(instruction);
+    out << code.binary << '\n';
+    std::cout << code.binary << "\n\n----\n\n";
   }
-
-  std::cout << symbols.symbols["ponggame.0"];
 }

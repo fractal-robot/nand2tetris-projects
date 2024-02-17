@@ -32,5 +32,38 @@ CHIP CPU {
         pc[15];          // Address of next instruction
 
     PARTS:
-    // make the PC circuit!
+    // registers 
+    
+    Not(in = instruction[15], out = ALoad);
+    Mux16(b = instruction, a = aluOut, sel = ALoad, out = aIn);
+    Or(a = instruction[5], b = ALoad, out = loadA);
+    ARegister(in = aIn, load = loadA, out = aReg);
+    DRegister(in = aluOut, load = instruction[4], out = dReg);
+
+    // instruction counter
+    Not(in = ng, out = notNg);
+    Not(in = zr, out = notZr);
+    And(a = zr, b = instruction[1], out = and1);
+    And(a = ng, b = instruction[2], out = and2);
+    And(a = notNg, b = notZr, out = andA);
+    And(a = andA, b = instruction[0], out = and3);
+    Or(a = and1, b = and2, out = or1);
+    Or(a = or1, b = and3, out = pcLoad);
+    And(a = pcLoad, b = instruction[15], out = pcLoadFinal);
+    Not(in = pcLoadFinal, out = pcInc);
+    PC(in = aReg, load = pcLoadFinal, inc = pcInc, reset = reset, out[0..14] = pc);
+
+    // alu and input + output selection 
+    Mux16(a = aReg, b = inM, sel = instruction[12], out = aluY);
+    ALU(x=dReg ,y=aluY ,zx=instruction[11] ,nx=instruction[10] ,zy=instruction[9] , ny=instruction[8],f=instruction[7],no=instruction[6], out=aluOut,zr=zr, ng=ng);
+
+    Mux16(a = false, b = aluOut, sel = writeMem, out = outM);
+    And(a = instruction[15], b = instruction[3], out = writeMem);
+    And(a = true, b = writeMem, out = writeM);
+    And16(a = true, b = aReg, out[0..14] = addressM);
+
+
+
+
 }
+
